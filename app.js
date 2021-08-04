@@ -41,8 +41,7 @@ const ReviewSchema = mongoose.Schema({
 const Review = mongoose.model("review", ReviewSchema);
 
 app.post("/review", function (req, res) {
-    const review = req.body;
-    Review.create(review)
+    Review.create(req.body)
         .then(function (review) {
             res.status(201).send(review)
         })
