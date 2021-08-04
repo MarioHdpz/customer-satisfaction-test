@@ -41,6 +41,17 @@ const ReviewSchema = mongoose.Schema({
 
 const Review = mongoose.model("review", ReviewSchema);
 
+function checkCredentials(req, res, next) {
+    const token = req.headers.authorization;
+    if (!token) {
+        return res.status(403).send({ "message": "A token is required for authentication" });
+    }
+    if (token !== process.env.API_KEY) {
+        return res.status(401).send({ "message": "Invalid API token" });
+    }
+    next();
+}
+
 app.post("/review", function (req, res) {
     Review.create(req.body)
         .then(function (review) {
@@ -72,12 +83,12 @@ function getFilters(req) {
         filters.push({ datetime: { $lte: req.query.to } })
     }
     if (filters.length) {
-        return {$and: filters }
+        return { $and: filters }
     }
     return {}
 }
 
-app.get("/report", function (req, res) {
+app.get("/report", checkCredentials, function (req, res) {
     Review.find({ ...getFilters(req) }).then(function (reviews) {
         res.send(getReportData(reviews));
     }).catch(function (error) {
@@ -85,7 +96,7 @@ app.get("/report", function (req, res) {
     });
 });
 
-app.get("/report/:storeId", function (req, res) {
+app.get("/report/:storeId", checkCredentials, function (req, res) {
     Review.find({ ...getFilters(req), storeId: req.params.storeId }).then(function (reviews) {
         res.send(getReportData(reviews));
     }).catch(function (error) {
