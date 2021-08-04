@@ -22,7 +22,36 @@ mongoose.connect(
     { useUnifiedTopology: true, useNewUrlParser: true }
 );
 
-app.get("/", function(req, res) {
+const ReviewSchema = mongoose.Schema({
+    store_id: {
+        type: Number,
+        required: true
+    },
+    rating: {
+        type: Number,
+        min: 0,
+        max: 5
+    },
+    datetime: {
+        type: Date,
+        default: Date.now
+    }
+});
+
+const Review = mongoose.model("review", ReviewSchema);
+
+app.post("/review", function (req, res) {
+    const review = req.body;
+    Review.create(review)
+        .then(function (review) {
+            res.status(201).send(review)
+        })
+        .catch(function (error) {
+            res.status(400).send({ "type": error.name, "message": error.message })
+        })
+});
+
+app.get("/", function (req, res) {
     res.send("Welcome tu customer satisfaction API!")
 });
 
