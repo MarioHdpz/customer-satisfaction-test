@@ -5,6 +5,9 @@ Customer satisfaction API
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
 
 // Global app object
 const app = express();
@@ -41,26 +44,36 @@ const ReviewSchema = mongoose.Schema({
 
 const Review = mongoose.model("review", ReviewSchema);
 
+const UserSchema = mongoose.Schema({
+    email: {
+        type: String,
+        required: true
+    },
+    role: {
+        type: String,
+        default: "director"
+    },
+    password: {
+        type: String,
+        required: true
+    }
+});
+
+const User = mongoose.model("user", UserSchema);
+
 function checkCredentials(req, res, next) {
     const token = req.headers.authorization;
     if (!token) {
         return res.status(403).send({ "message": "A token is required for authentication" });
     }
-    if (token !== process.env.API_KEY) {
-        return res.status(401).send({ "message": "Invalid API token" });
+    try {
+        const user = jwt.verify(token, process.env.PRIVATE_KEY)
+        req.user = user;
+        next()
+    } catch (error) {
+        res.status(401).send({ "message": "Invalid API token" });
     }
-    next();
 }
-
-app.post("/review", function (req, res) {
-    Review.create(req.body)
-        .then(function (review) {
-            res.status(201).send(review)
-        })
-        .catch(function (error) {
-            res.status(400).send({ "type": error.name, "message": error.message })
-        })
-});
 
 function getReportData(reviews) {
     const visitors = reviews.length;
@@ -87,6 +100,42 @@ function getFilters(req) {
     }
     return {}
 }
+
+app.post("/sign-up", function (req, res) {
+    const password = bcrypt.hashSync(req.body.password, 10)
+    User.create({ ...req.body, password: password }).then(function (user) {
+        res.send(201);
+    }).catch(function (error) {
+        res.status(400).send({ "type": error.name, "message": error.message })
+    });
+});
+
+app.post("/login", function (req, res) {
+    const { email, password } = req.body;
+    const errorMessage = { "message": "Incorrect user or password" };
+    User.findOne({ email }).then(function (user) {
+        if (!bcrypt.compareSync(password, user.password)) {
+            res.status(401).send(errorMessage)
+        }
+        const token = jwt.sign({
+            id: user._id,
+            role: user.role
+        }, process.env.PRIVATE_KEY )
+        res.send({ token })
+    }).catch(function (error) {
+        res.status(400).send(error)
+    });
+});
+
+app.post("/review", function (req, res) {
+    Review.create(req.body)
+        .then(function (review) {
+            res.status(201).send(review)
+        })
+        .catch(function (error) {
+            res.status(400).send({ "type": error.name, "message": error.message })
+        })
+});
 
 app.get("/report", checkCredentials, function (req, res) {
     Review.find({ ...getFilters(req) }).then(function (reviews) {
