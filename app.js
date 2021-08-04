@@ -23,14 +23,15 @@ mongoose.connect(
 );
 
 const ReviewSchema = mongoose.Schema({
-    store_id: {
+    storeId: {
         type: Number,
         required: true
     },
-    rating: {
+    score: {
         type: Number,
         min: 0,
-        max: 5
+        max: 5,
+        required: true
     },
     datetime: {
         type: Date,
@@ -48,6 +49,30 @@ app.post("/review", function (req, res) {
         .catch(function (error) {
             res.status(400).send({ "type": error.name, "message": error.message })
         })
+});
+
+
+app.get("/report", function (req, res) {
+    const filters = []
+    if (req.query.from) {
+        filters.push({ datetime: { $gte: req.query.from } })
+    }
+    if (req.query.to) {
+        filters.push({ datetime: { $lte: req.query.to } })
+    }
+    Review.find({ $and: filters }).then(function (reviews) {
+        const visitors = reviews.length;
+        const reviewSum = reviews.reduce(function (sum, review) {
+            return sum + review.score;
+        }, 0);
+        const average = reviewSum / visitors;
+        res.send({
+            averageScore: average ? average : 0,
+            visitors
+        })
+    }).catch(function (error) {
+        res.status(400).send({ "type": error.name, "message": error.message })
+    });
 });
 
 app.get("/", function (req, res) {
