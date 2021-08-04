@@ -51,8 +51,19 @@ app.post("/review", function (req, res) {
         })
 });
 
+function getReportData(reviews) {
+    const visitors = reviews.length;
+    const reviewSum = reviews.reduce(function (sum, review) {
+        return sum + review.score;
+    }, 0);
+    const average = reviewSum / visitors;
+    return {
+        averageScore: average ? average : 0,
+        visitors
+    }
+}
 
-app.get("/report", function (req, res) {
+function getFilters(req) {
     const filters = []
     if (req.query.from) {
         filters.push({ datetime: { $gte: req.query.from } })
@@ -60,16 +71,23 @@ app.get("/report", function (req, res) {
     if (req.query.to) {
         filters.push({ datetime: { $lte: req.query.to } })
     }
-    Review.find({ $and: filters }).then(function (reviews) {
-        const visitors = reviews.length;
-        const reviewSum = reviews.reduce(function (sum, review) {
-            return sum + review.score;
-        }, 0);
-        const average = reviewSum / visitors;
-        res.send({
-            averageScore: average ? average : 0,
-            visitors
-        })
+    if (filters.length) {
+        return {$and: filters }
+    }
+    return {}
+}
+
+app.get("/report", function (req, res) {
+    Review.find({ ...getFilters(req) }).then(function (reviews) {
+        res.send(getReportData(reviews));
+    }).catch(function (error) {
+        res.status(400).send({ "type": error.name, "message": error.message })
+    });
+});
+
+app.get("/report/:storeId", function (req, res) {
+    Review.find({ ...getFilters(req), storeId: req.params.storeId }).then(function (reviews) {
+        res.send(getReportData(reviews));
     }).catch(function (error) {
         res.status(400).send({ "type": error.name, "message": error.message })
     });
